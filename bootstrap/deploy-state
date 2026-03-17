@@ -1,0 +1,23 @@
+#! /usr/bin/env bash
+
+function fatal() {
+  local message=$1
+  echo "Failed: '$1'"
+  exit 1
+}
+
+function main() {
+  local subscription_id=$1
+  local org_name=$2
+  local deployment_location="westeurope"
+
+  echo "connection to $subscription_id"
+  az account set --subscription "$subscription_id" || fatal "could not change subscription"
+  echo "deploying..."
+  az deployment sub create \
+    --parameters ./$org_name.bicepparam \
+    --location "$deployment_location" || fatal "deployment failed"
+  echo done
+}
+
+main $1 $2
