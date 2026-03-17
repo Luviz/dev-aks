@@ -20,7 +20,7 @@ update the org-name and other parameters, then run.
 
 # TODO
 
-- [ ] Terraform bootstrap
+- [x] Terraform bootstrap
 - [ ] AVM TF
 - [ ] Egress
 - [ ] Argo
