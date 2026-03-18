@@ -3,3 +3,8 @@ tmp
 
 bootstrap/*.bicepparam
 !bootstrap/base.bicepparam
+
+terraform/backend/*.tfvars
+!terraform/backend/template.tfvars
+
+.terraform*
