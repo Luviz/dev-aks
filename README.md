@@ -5,7 +5,7 @@ An Azure Kubernetes Server designed for devolvement.
 Core Idea is to be able to delete and getting it up and running quick, 
 for minimal cost.
 
-# Bootstrap
+## Bootstrap
 
 ```sh
 cd ./bootstrap
@@ -18,10 +18,22 @@ update the org-name and other parameters, then run.
 ./deploy-state {subscription-id} {org-name}
 ```
 
+## Terraform
+
+### Backend
+
+use the template to make a copy `terraform/backend/template.tfvars
+
+```sh
+terraform init --backend-config ./backend/{env}.tfvars --reconfigure
+```
+
+
+
 # TODO
 
 - [x] Terraform bootstrap
-- [ ] AVM TF
+- [x] AVM TF - AKS AVM has bugs and issues in it
 - [ ] Egress
 - [ ] Argo
 
