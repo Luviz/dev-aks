@@ -9,3 +9,4 @@ param tfstateResourceGroupName = 'rg-${environment}-${locationShort}-tfstate' //
 param storageAccountName = 'sa${environment}${locationShort}${org}tfstate' // The name of the storage account to create where the Tearrform states will be located
 param managedIdentityName = 'uai-${environment}-${locationShort}-identity-id' // The name of managed identity to create
 param workspaceResourceGroupName = 'rg-${environment}-aks'
+param superUser = 'clark.kent@dailymail.com' // use user object id

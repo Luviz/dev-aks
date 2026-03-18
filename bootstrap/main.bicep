@@ -15,6 +15,10 @@ param managedIdentityName string
 @description('Required. Name target RG.')
 param workspaceResourceGroupName string
 
+@description('super user to get access tfstate data plain.')
+param superUser string
+
+
 // @description('Required. The subject for the managed identity federated credentials.')
 // param azureDevOpsFederatedCredentialsSubject string
 
@@ -125,5 +129,18 @@ module tfstateRoleAssignment 'br/public:avm/res/authorization/role-assignment/rg
     roleDefinitionIdOrName: '/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe'
     principalType: 'ServicePrincipal'
     enableTelemetry: false
+  }
+}
+
+// adding super user with access
+
+module tfstateUserRoleAssignment 'br/public:avm/res/authorization/role-assignment/rg-scope:0.1.1' = {
+  name: 'tfstateUserRoleAssignment'
+  scope: az.resourceGroup(tfstateResourceGroupName)
+  params: {
+    principalId: superUser
+    roleDefinitionIdOrName: '/providers/Microsoft.Authorization/roleDefinitions/ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+    enableTelemetry: false
+    principalType: 'User'
   }
 }
