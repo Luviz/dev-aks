@@ -21,7 +21,7 @@ env:
 jobs:
   clean:
     runs-on: ubuntu-latest
-    environment: production
+    environment: luviz-dev-MPN
     if: inputs.confirm == 'CLEAN'
     defaults:
       run:

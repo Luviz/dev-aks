@@ -24,7 +24,7 @@ permissions:
 jobs:
   bootstrap:
     runs-on: ubuntu-latest
-    environment: production
+    environment: luviz-dev-MPN
     steps:
       - name: Checkout
         uses: actions/checkout@v5

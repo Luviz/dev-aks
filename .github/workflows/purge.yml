@@ -25,7 +25,7 @@ env:
 jobs:
   purge:
     runs-on: ubuntu-latest
-    environment: production
+    environment: luviz-dev-MPN
     if: inputs.confirm == 'PURGE'
     steps:
       - name: Checkout
