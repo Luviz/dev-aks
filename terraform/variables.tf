@@ -1,0 +1,60 @@
+// ──────────────────────────────────────────────────────────
+// Variables — single source of truth for all environments
+// ──────────────────────────────────────────────────────────
+
+variable "environment" {
+  description = "Environment name (dev, staging, prod)."
+  type        = string
+  default     = "dev"
+}
+
+variable "location" {
+  description = "Azure region for all resources."
+  type        = string
+  default     = "westeurope"
+}
+
+variable "location_short" {
+  description = "Short location code used in naming (e.g. we, ne, eus)."
+  type        = string
+  default     = "we"
+}
+
+variable "resource_group_name" {
+  description = "Name of the pre-existing workspace resource group."
+  type        = string
+  default     = "rg-dev-aks"
+}
+
+// ── Entra ID / SSO ────────────────────────────────────────
+
+variable "tenant_id" {
+  description = "Azure AD / Entra tenant ID."
+  type        = string
+}
+
+variable "argocd_admin_email" {
+  description = "Email of the user who should have Argo CD admin access."
+  type        = string
+}
+
+// ── Argo CD ────────────────────────────────────────────────
+
+variable "argocd_github_app_id" {
+  description = "GitHub App ID used by Argo CD to access repositories."
+  type        = string
+  default     = ""
+}
+
+variable "argocd_github_app_installation_id" {
+  description = "GitHub App installation ID for the target org."
+  type        = string
+  default     = ""
+}
+
+variable "argocd_github_app_private_key" {
+  description = "PEM-encoded private key for the GitHub App."
+  type        = string
+  sensitive   = true
+  default     = ""
+}

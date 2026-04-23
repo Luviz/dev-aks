@@ -1,0 +1,69 @@
+name: Scale Up (Resume)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Every weekday at 07:00 UTC (09:00 CET) — start the cluster for the workday
+    - cron: "0 7 * * 1-5"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  scale-up:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Start AKS Cluster
+        run: |
+          CLUSTER_NAME="${{ vars.AKS_CLUSTER_NAME }}"
+          RG="${{ vars.AKS_RESOURCE_GROUP }}"
+
+          echo "==> Starting AKS cluster: $CLUSTER_NAME in $RG"
+          az aks start \
+            --resource-group "$RG" \
+            --name "$CLUSTER_NAME"
+
+          echo "==> Waiting for nodes to be ready..."
+          az aks get-credentials --resource-group "$RG" --name "$CLUSTER_NAME" --overwrite-existing
+          kubectl wait --for=condition=Ready node --all --timeout=300s
+
+      - name: Get Envoy Gateway LB IP
+        id: lb_ip
+        run: |
+          for i in $(seq 1 30); do
+            LB_IP=$(kubectl get svc -n envoy-gateway \
+              -l gateway.envoyproxy.io/owning-gateway-name=default-gateway \
+              -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+            if [[ -n "$LB_IP" && "$LB_IP" != "null" ]]; then
+              echo "ip=$LB_IP" >> $GITHUB_OUTPUT
+              break
+            fi
+            sleep 10
+          done
+
+      - name: Summary
+        run: |
+          LB_IP="${{ steps.lb_ip.outputs.ip }}"
+          DASHED=$(echo "$LB_IP" | tr '.' '-')
+
+          echo "## Scale Up Complete 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "AKS cluster \`${{ vars.AKS_CLUSTER_NAME }}\` is running." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ -n "$LB_IP" ]]; then
+            echo "| Service | URL |" >> $GITHUB_STEP_SUMMARY
+            echo "|---------|-----|" >> $GITHUB_STEP_SUMMARY
+            echo "| Argo CD | https://argocd-${DASHED}.nip.io |" >> $GITHUB_STEP_SUMMARY
+          fi

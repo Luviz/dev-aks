@@ -7,4 +7,11 @@ bootstrap/*.bicepparam
 terraform/backend/*.tfvars
 !terraform/backend/template.tfvars
 
+terraform/*.tfvars
+!terraform/template.tfvars
+
 .terraform*
+
+# Helm chart dependencies (downloaded via helm dep update)
+helm/*/charts/
+helm/**/Chart.lock

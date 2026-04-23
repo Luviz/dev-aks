@@ -1,23 +1,56 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
+set -euo pipefail
 
 function fatal() {
-  local message=$1
-  echo "Failed: '$1'"
+  echo "ERROR: $1" >&2
   exit 1
 }
 
-function main() {
-  local subscription_id=$1
-  local org_name=$2
-  local deployment_location="westeurope"
+function usage() {
+  cat <<EOF
+Usage: ./deploy-state <subscription-id> <org-name> [location]
 
-  echo "connection to $subscription_id"
-  az account set --subscription "$subscription_id" || fatal "could not change subscription"
-  echo "deploying..."
-  az deployment sub create \
-    --parameters ./$org_name.bicepparam \
-    --location "$deployment_location" || fatal "deployment failed"
-  echo done
+Bootstrap the Terraform state infrastructure for a new environment.
+
+Arguments:
+  subscription-id   Azure subscription to deploy into
+  org-name          Organisation name (must match a <org-name>.bicepparam file)
+  location          (optional) Azure region, defaults to westeurope
+
+Example:
+  ./deploy-state 37c9effe-ba3f-4b42-aaa7-afdcfeafa9b2 luviz
+EOF
+  exit 0
 }
 
-main $1 $2
+function main() {
+  [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]] && usage
+  [[ $# -lt 2 ]] && fatal "Missing arguments. Run with --help for usage."
+
+  local subscription_id="$1"
+  local org_name="$2"
+  local deployment_location="${3:-westeurope}"
+  local param_file="./${org_name}.bicepparam"
+
+  [[ -f "$param_file" ]] || fatal "Parameter file not found: $param_file"
+
+  echo "==> Setting subscription to $subscription_id"
+  az account set --subscription "$subscription_id" || fatal "Could not set subscription"
+
+  echo "==> Deploying bootstrap ($param_file) to $deployment_location"
+  az deployment sub create \
+    --parameters "$param_file" \
+    --location "$deployment_location" \
+    --output table || fatal "Deployment failed"
+
+  echo ""
+  echo "==> Bootstrap complete. Outputs:"
+  az deployment sub show \
+    --name "main" \
+    --query "properties.outputs" \
+    --output table 2>/dev/null || true
+
+  echo "Done."
+}
+
+main "$@"

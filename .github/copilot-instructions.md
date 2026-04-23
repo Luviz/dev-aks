@@ -11,8 +11,12 @@ The core design goal is a cluster that can be torn down and rebuilt quickly at m
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bootstrap/`             | Bicep templates + AVM Bicep modules for one-time state bootstrapping (resource groups, storage account for tfstate, managed identity, RBAC) |
 | `bootstrap/deploy-state` | Shell script to deploy bootstrap via `az deployment sub create`                                                                             |
-| `terraform/`             | Terraform (AzureRM provider ~4.60, required version ~1.7) for the AKS cluster, VNet, ACR, and supporting resources                          |
-| `terraform/backend/`     | Per-environment `.tfvars` for the azurerm backend (OIDC + Azure AD auth)                                                                    |
+| `terraform/`             | Terraform (AzureRM ~4.60, AzureAD ~3.1, Helm ~2.17, Kubernetes ~2.36) for AKS, VNet, ACR, Entra SSO, Helm bootstrap |
+| `terraform/backend/`     | Per-environment `.tfvars` for the azurerm backend (OIDC + Azure AD auth) |
+| `helm/argocd/`           | Argo CD Helm chart with Entra ID OIDC SSO |
+| `helm/envoy-gateway/`    | Envoy Gateway chart (managed by Argo CD via app-of-apps) |
+| `helm/argocd-apps/`      | App-of-apps — Argo CD manages Envoy Gateway and future cluster services |
+| `.github/workflows/`     | Lifecycle: bootstrap, deploy, scale-down/up, clean, purge |
 
 ## Tech Stack & Conventions
 
@@ -48,9 +52,7 @@ The core design goal is a cluster that can be torn down and rebuilt quickly at m
 ### Planned Work (see README TODO)
 
 - **Egress**: Add egress controls (NAT Gateway or Azure Firewall + UDR).
-- **Argo CD**: Deploy Argo CD for GitOps-based application delivery.
-- **Envoy**: Envoy-based ingress (likely via Envoy Gateway or Contour).
-- **GitHub Actions CI/CD**: Workflows for `terraform plan/apply`.
+- **TLS**: cert-manager + Let's Encrypt for proper HTTPS certificates.
 
 ## Coding Guidelines
 

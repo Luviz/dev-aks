@@ -1,0 +1,9 @@
+# Git source for the helm charts in this repo
+repoURL: ""      # set dynamically: https://github.com/<org>/<repo>.git
+targetRevision: main
+
+# Envoy Gateway application
+envoyGateway:
+  enabled: true
+  namespace: envoy-gateway
+  path: helm/envoy-gateway

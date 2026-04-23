@@ -1,0 +1,51 @@
+name: Bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      subscription_id:
+        description: "Azure Subscription ID"
+        required: true
+        type: string
+      org_name:
+        description: "Organisation name (must match a <org>.bicepparam file)"
+        required: true
+        type: string
+      location:
+        description: "Azure region"
+        required: false
+        default: "westeurope"
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ inputs.subscription_id }}
+
+      - name: Run bootstrap
+        working-directory: bootstrap
+        run: |
+          chmod +x ./deploy-state
+          ./deploy-state "${{ inputs.subscription_id }}" "${{ inputs.org_name }}" "${{ inputs.location }}"
+
+      - name: Show outputs
+        run: |
+          echo "## Bootstrap Complete ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Subscription: \`${{ inputs.subscription_id }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Organisation: \`${{ inputs.org_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Location: \`${{ inputs.location }}\`" >> $GITHUB_STEP_SUMMARY

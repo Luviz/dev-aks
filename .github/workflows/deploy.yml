@@ -1,0 +1,102 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: false
+        default: "dev"
+        type: choice
+        options:
+          - dev
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_BACKEND_CONFIG: "./backend/${{ inputs.environment || 'dev' }}.tfvars"
+  ARM_USE_OIDC: true
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+
+      - name: Terraform Init
+        run: terraform init -backend-config="$TF_BACKEND_CONFIG" -input=false
+
+      - name: Terraform Plan
+        run: |
+          terraform plan \
+            -var-file="${{ inputs.environment || 'dev' }}.tfvars" \
+            -out=tfplan \
+            -input=false
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -input=false tfplan
+
+      - name: Get AKS Credentials
+        run: |
+          CLUSTER_NAME=$(terraform output -raw aks_cluster_name)
+          RG=$(terraform output -raw aks_resource_group)
+          az aks get-credentials --resource-group "$RG" --name "$CLUSTER_NAME" --overwrite-existing
+
+      - name: Wait for Argo CD
+        run: |
+          echo "Waiting for Argo CD pods..."
+          kubectl wait --for=condition=ready pod \
+            -l app.kubernetes.io/name=argocd-server \
+            -n argocd \
+            --timeout=300s
+
+      - name: Get Envoy Gateway LB IP
+        id: lb_ip
+        run: |
+          for i in $(seq 1 30); do
+            LB_IP=$(kubectl get svc -n envoy-gateway \
+              -l gateway.envoyproxy.io/owning-gateway-name=default-gateway \
+              -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)
+            if [[ -n "$LB_IP" && "$LB_IP" != "null" ]]; then
+              echo "ip=$LB_IP" >> $GITHUB_OUTPUT
+              break
+            fi
+            echo "Attempt $i/30 — waiting 10s..."
+            sleep 10
+          done
+
+      - name: Summary
+        run: |
+          LB_IP="${{ steps.lb_ip.outputs.ip }}"
+          DASHED=$(echo "$LB_IP" | tr '.' '-')
+
+          echo "## Deployment Complete 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| AKS Cluster | \`$(terraform output -raw aks_cluster_name)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Argo CD | https://argocd-${DASHED}.nip.io |" >> $GITHUB_STEP_SUMMARY
+          echo "| ACR | \`$(terraform output -raw acr_login_server)\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| LB IP | \`${LB_IP}\` |" >> $GITHUB_STEP_SUMMARY

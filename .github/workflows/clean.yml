@@ -1,0 +1,62 @@
+name: Clean (Terraform Destroy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type 'CLEAN' to confirm destruction of all Terraform-managed resources"
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  ARM_USE_OIDC: true
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    environment: production
+    if: inputs.confirm == 'CLEAN'
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+
+      - name: Terraform Init
+        run: terraform init -backend-config="./backend/dev.tfvars" -input=false
+
+      - name: Terraform Destroy
+        run: |
+          terraform destroy \
+            -var-file="dev.tfvars" \
+            -auto-approve \
+            -input=false
+
+      - name: Summary
+        run: |
+          echo "## Clean Complete 🧹" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All Terraform-managed resources have been destroyed." >> $GITHUB_STEP_SUMMARY
+          echo "Bootstrap resources (tfstate storage, managed identity) are preserved." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Run **Deploy** to recreate everything." >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,44 @@
+name: Scale Down (Minimal Cost)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Every weekday at 20:00 UTC (22:00 CET) — stop the cluster overnight
+    - cron: "0 20 * * 1-5"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  scale-down:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Stop AKS Cluster
+        run: |
+          CLUSTER_NAME="${{ vars.AKS_CLUSTER_NAME }}"
+          RG="${{ vars.AKS_RESOURCE_GROUP }}"
+
+          echo "==> Stopping AKS cluster: $CLUSTER_NAME in $RG"
+          az aks stop \
+            --resource-group "$RG" \
+            --name "$CLUSTER_NAME" \
+            --no-wait
+
+          echo "## Scale Down Complete 💤" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "AKS cluster \`$CLUSTER_NAME\` is stopping." >> $GITHUB_STEP_SUMMARY
+          echo "VNet, ACR, and state are preserved." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Run **Scale Up** to resume." >> $GITHUB_STEP_SUMMARY

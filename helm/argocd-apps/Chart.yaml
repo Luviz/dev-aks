@@ -1,0 +1,5 @@
+apiVersion: v2
+name: argocd-apps
+description: App-of-apps — Argo CD manages cluster services (Envoy Gateway, etc.)
+type: application
+version: 0.1.0

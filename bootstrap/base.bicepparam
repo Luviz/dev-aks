@@ -1,12 +1,19 @@
 using './main.bicep'
 
+// ── Customise these per org/tenant ─────────────────────────
 var locationShort = 'we'
 var environment = 'dev'
 var org = '$ORG_NAME'
 
-param location = 'westeurope' // Azure location where the resources will be deployed
-param tfstateResourceGroupName = 'rg-${environment}-${locationShort}-tfstate' // The name of resource group to create where the storage account for Terraform state will be located
-param storageAccountName = 'sa${environment}${locationShort}${org}tfstate' // The name of the storage account to create where the Tearrform states will be located
-param managedIdentityName = 'uai-${environment}-${locationShort}-identity-id' // The name of managed identity to create
+param location = 'westeurope'
+param tfstateResourceGroupName = 'rg-${environment}-${locationShort}-tfstate'
+param storageAccountName = 'sa${environment}${locationShort}${org}tfstate'
+param managedIdentityName = 'uai-${environment}-${locationShort}-identity-id'
 param workspaceResourceGroupName = 'rg-${environment}-aks'
-param superUser = 'clark.kent@dailymail.com' // use user object id
+param superUser = '$SUPER_USER_OBJECT_ID' // Entra object ID of the super-user
+
+// ── GitHub OIDC federation ─────────────────────────────────
+param gitHubOrg = '$GITHUB_ORG'   // e.g. 'Luviz'
+param gitHubRepo = '$GITHUB_REPO' // e.g. 'dev-aks'
+param gitHubBranches = ['main']
+param gitHubEnvironments = ['production']

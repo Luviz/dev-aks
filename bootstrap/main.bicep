@@ -1,3 +1,12 @@
+// ──────────────────────────────────────────────────────────
+// Bootstrap: tfstate storage, managed identity, OIDC federation
+// Designed to be portable across tenants and subscriptions.
+// ──────────────────────────────────────────────────────────
+
+targetScope = 'subscription'
+
+// ── Core parameters ────────────────────────────────────────
+
 @description('Optional. Location of the Resource Group. It uses the deployment\'s location when not provided.')
 param location string = deployment().location
 
@@ -8,21 +17,30 @@ param tfstateResourceGroupName string
 @description('Required. Name of the Storage Account. Must be lower-case.')
 param storageAccountName string
 
-
 @description('Required. Name of the User Assigned Identity.')
 param managedIdentityName string
 
-@description('Required. Name target RG.')
+@description('Required. Name of the workspace Resource Group (where AKS etc. live).')
 param workspaceResourceGroupName string
 
-@description('super user to get access tfstate data plain.')
+@description('Object ID of a super-user who gets direct access to tfstate data plane.')
 param superUser string
 
+// ── GitHub OIDC federation ─────────────────────────────────
 
-// @description('Required. The subject for the managed identity federated credentials.')
-// param azureDevOpsFederatedCredentialsSubject string
+@description('GitHub organisation or username that owns the repo (e.g. "Luviz").')
+param gitHubOrg string
 
-targetScope = 'subscription'
+@description('GitHub repository name (e.g. "dev-aks").')
+param gitHubRepo string
+
+@description('Git branches that are allowed to authenticate via OIDC. Default: main.')
+param gitHubBranches array = ['main']
+
+@description('Allow GitHub environment-based OIDC subjects. Leave empty to skip.')
+param gitHubEnvironments array = ['production']
+
+// ── Resource Groups ────────────────────────────────────────
 
 module tfstateResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2' = {
   name: 'tfstateResourceGroupDeployment'
@@ -48,6 +66,8 @@ module workspaceResourceGroup 'br/public:avm/res/resources/resource-group:0.4.2'
   }
 }
 
+// ── Storage Account (tfstate) ──────────────────────────────
+
 module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
   name: 'storageAccountDeployment'
   scope: az.resourceGroup(tfstateResourceGroupName)
@@ -56,8 +76,6 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
     kind: 'StorageV2'
     skuName: 'Standard_LRS'
     allowSharedKeyAccess: false
-    // allowBlobPublicAccess should be set to false when a private network is available
-    // and the storage account should use private endpoint
     allowBlobPublicAccess: true
     tags: {
       deploymentType: 'bicep'
@@ -86,13 +104,33 @@ module storageAccount 'br/public:avm/res/storage/storage-account:0.31.0' = {
       versionDeletePolicyDays: 3
     }
     networkAcls: {
-      // defaultAction should be set to 'Deny' when a private network is available
-      // and the storage account uses private endpoint
       defaultAction: 'Allow'
     }
     enableTelemetry: false
   }
 }
+
+// ── Managed Identity + GitHub OIDC federation ──────────────
+
+var ghIssuer = 'https://token.actions.githubusercontent.com'
+
+var branchCredentials = [
+  for branch in gitHubBranches: {
+    name: 'gh-${gitHubOrg}-${gitHubRepo}-branch-${branch}'
+    audiences: ['api://AzureADTokenExchange']
+    issuer: ghIssuer
+    subject: 'repo:${gitHubOrg}/${gitHubRepo}:ref:refs/heads/${branch}'
+  }
+]
+
+var envCredentials = [
+  for env in gitHubEnvironments: {
+    name: 'gh-${gitHubOrg}-${gitHubRepo}-env-${env}'
+    audiences: ['api://AzureADTokenExchange']
+    issuer: ghIssuer
+    subject: 'repo:${gitHubOrg}/${gitHubRepo}:environment:${env}'
+  }
+]
 
 module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-identity:0.5.0' = {
   name: 'userAssignedIdentityDeployment'
@@ -101,6 +139,7 @@ module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-id
     name: managedIdentityName
     location: location
     enableTelemetry: false
+    federatedIdentityCredentials: concat(branchCredentials, envCredentials)
     tags: {
       deploymentType: 'bicep'
     }
@@ -109,6 +148,8 @@ module userAssignedIdentity 'br/public:avm/res/managed-identity/user-assigned-id
     tfstateResourceGroup
   ]
 }
+
+// ── Role Assignments ───────────────────────────────────────
 
 module workspaceRoleAssignment 'br/public:avm/res/authorization/role-assignment/rg-scope:0.1.1' = {
   name: 'workspaceRoleAssignmentDeployment'
@@ -121,6 +162,7 @@ module workspaceRoleAssignment 'br/public:avm/res/authorization/role-assignment/
   }
 }
 
+// Storage Blob Data Owner on the tfstate RG
 module tfstateRoleAssignment 'br/public:avm/res/authorization/role-assignment/rg-scope:0.1.1' = {
   name: 'tfstateRoleAssignment'
   scope: az.resourceGroup(tfstateResourceGroupName)
@@ -132,8 +174,6 @@ module tfstateRoleAssignment 'br/public:avm/res/authorization/role-assignment/rg
   }
 }
 
-// adding super user with access
-
 module tfstateUserRoleAssignment 'br/public:avm/res/authorization/role-assignment/rg-scope:0.1.1' = {
   name: 'tfstateUserRoleAssignment'
   scope: az.resourceGroup(tfstateResourceGroupName)
@@ -144,3 +184,12 @@ module tfstateUserRoleAssignment 'br/public:avm/res/authorization/role-assignmen
     principalType: 'User'
   }
 }
+
+// ── Outputs ────────────────────────────────────────────────
+
+output managedIdentityClientId string = userAssignedIdentity.outputs.clientId
+output managedIdentityPrincipalId string = userAssignedIdentity.outputs.principalId
+output managedIdentityName string = userAssignedIdentity.outputs.name
+output storageAccountName string = storageAccount.outputs.name
+output tfstateResourceGroupName string = tfstateResourceGroupName
+output workspaceResourceGroupName string = workspaceResourceGroupName

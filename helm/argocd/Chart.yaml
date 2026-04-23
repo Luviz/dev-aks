@@ -1,0 +1,9 @@
+apiVersion: v2
+name: argocd
+description: Argo CD with Entra ID SSO for dev-aks
+type: application
+version: 0.1.0
+dependencies:
+  - name: argo-cd
+    version: "7.9.1"
+    repository: https://argoproj.github.io/argo-helm

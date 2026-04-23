@@ -1,0 +1,9 @@
+apiVersion: v2
+name: envoy-gateway
+description: Envoy Gateway with GatewayClass and default Gateway for dev-aks
+type: application
+version: 0.1.0
+dependencies:
+  - name: gateway-helm
+    repository: oci://docker.io/envoyproxy
+    version: v1.3.1

@@ -1,7 +1,7 @@
 locals {
-  resource_group_name = "rg-dev-aks"
+  resource_group_name = var.resource_group_name
 }
 
 locals {
-    acr_name = module.naming.container_registry.name_unique
+  acr_name = module.naming.container_registry.name_unique
 }

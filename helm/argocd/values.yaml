@@ -1,0 +1,86 @@
+route:
+  enabled: true
+  host: "" # set dynamically: argocd-<IP-DASHED>.nip.io
+  gatewayName: default-gateway
+  gatewayNamespace: envoy-gateway
+  backendService: "" # auto-detected as <release>-server
+
+argo-cd:
+  global:
+    domain: "" # set dynamically
+
+  configs:
+    params:
+      server.insecure: true # TLS terminated at Envoy Gateway
+
+    cm:
+      url: "" # set dynamically: https://argocd-<IP-DASHED>.nip.io
+      oidc.config: |
+        name: Entra ID
+        issuer: ${ARGOCD_OIDC_ISSUER}
+        clientID: ${ARGOCD_OIDC_CLIENT_ID}
+        clientSecret: $oidc.entra.clientSecret
+        requestedScopes:
+          - openid
+          - profile
+          - email
+
+    rbac:
+      policy.default: role:readonly
+      policy.csv: |
+        g, ${ARGOCD_ADMIN_EMAIL}, role:admin
+
+    secret:
+      extra:
+        oidc.entra.clientSecret: ${ARGOCD_OIDC_CLIENT_SECRET}
+
+  server:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+  controller:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1
+        memory: 512Mi
+
+  repoServer:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+  redis:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+  applicationSet:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+  notifications:
+    enabled: false
+
+  dex:
+    enabled: false
