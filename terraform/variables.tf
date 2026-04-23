@@ -38,6 +38,12 @@ variable "argocd_admin_email" {
   type        = string
 }
 
+variable "argocd_admin_object_id" {
+  description = "Entra object ID of the Argo CD admin user (required for guest/external accounts)."
+  type        = string
+  default     = ""
+}
+
 // ── Argo CD ────────────────────────────────────────────────
 
 variable "argocd_github_app_id" {

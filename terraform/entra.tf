@@ -4,10 +4,7 @@
 
 data "azuread_client_config" "current" {}
 
-// Look up the admin user so we can reference their object ID
-data "azuread_user" "admin" {
-  user_principal_name = var.argocd_admin_email
-}
+// ── Argo CD app registration ──────────────────────────────
 
 resource "azuread_application" "argocd" {
   display_name = "argocd-${var.environment}-sso"
