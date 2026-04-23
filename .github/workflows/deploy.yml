@@ -93,6 +93,21 @@ jobs:
             -n argocd \
             --timeout=300s
 
+      - name: Wait for Envoy Gateway sync
+        run: |
+          echo "Waiting for Argo CD to sync Envoy Gateway..."
+          for i in $(seq 1 60); do
+            HEALTH=$(kubectl get application envoy-gateway -n argocd \
+              -o jsonpath='{.status.health.status}' 2>/dev/null || true)
+            SYNC=$(kubectl get application envoy-gateway -n argocd \
+              -o jsonpath='{.status.sync.status}' 2>/dev/null || true)
+            echo "Attempt $i/60 — health=$HEALTH sync=$SYNC"
+            if [[ "$HEALTH" == "Healthy" && "$SYNC" == "Synced" ]]; then
+              break
+            fi
+            sleep 10
+          done
+
       - name: Get Envoy Gateway LB IP
         id: lb_ip
         run: |
@@ -107,6 +122,44 @@ jobs:
             echo "Attempt $i/30 — waiting 10s..."
             sleep 10
           done
+          if [[ -z "$LB_IP" || "$LB_IP" == "null" ]]; then
+            echo "::warning::Could not get Envoy Gateway LB IP"
+          fi
+
+      - name: Configure Argo CD with LB IP
+        if: steps.lb_ip.outputs.ip != ''
+        run: |
+          LB_IP="${{ steps.lb_ip.outputs.ip }}"
+          DASHED=$(echo "$LB_IP" | tr '.' '-')
+          ARGOCD_HOST="argocd-${DASHED}.nip.io"
+          ARGOCD_URL="https://${ARGOCD_HOST}"
+
+          ENTRA_CLIENT_ID=$(terraform output -raw argocd_entra_client_id)
+
+          # Update Entra redirect URI
+          echo "==> Updating Entra app redirect URI to ${ARGOCD_URL}/auth/callback"
+          az ad app update \
+            --id "$ENTRA_CLIENT_ID" \
+            --web-redirect-uris "${ARGOCD_URL}/auth/callback" \
+            --only-show-errors
+
+          # Patch Argo CD configmap
+          echo "==> Patching Argo CD configmap with URL..."
+          kubectl -n argocd patch configmap argocd-cm \
+            --type merge -p "{\"data\":{\"url\":\"${ARGOCD_URL}\"}}"
+
+          # Enable HTTPRoute and set host via helm upgrade
+          echo "==> Enabling HTTPRoute for Argo CD..."
+          helm dependency update ../helm/argocd
+          helm upgrade argocd ../helm/argocd \
+            --namespace argocd \
+            --reuse-values \
+            --set "route.enabled=true" \
+            --set "route.host=${ARGOCD_HOST}" \
+            --set "argo-cd.global.domain=${ARGOCD_HOST}" \
+            --wait --timeout 5m
+
+          echo "==> Post-deploy complete: ${ARGOCD_URL}"
 
       - name: Summary
         run: |
