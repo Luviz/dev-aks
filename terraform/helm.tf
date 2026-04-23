@@ -19,32 +19,29 @@ resource "helm_release" "argocd" {
   timeout = 600
   wait    = true
 
-  # Entra OIDC SSO
-  set {
-    name = "argo-cd.configs.cm.oidc\\.config"
-    value = yamlencode(<<-EOT
-      name: Entra ID
-      issuer: https://login.microsoftonline.com/${var.tenant_id}/v2.0
-      clientID: ${azuread_application.argocd.client_id}
-      clientSecret: $oidc.entra.clientSecret
-      requestedScopes:
-        - openid
-        - profile
-        - email
-    EOT
-    )
-  }
-
-  set_sensitive {
-    name  = "argo-cd.configs.secret.extra.oidc\\.entra\\.clientSecret"
-    value = azuread_application_password.argocd.value
-  }
-
-  # RBAC — admin for the designated user
-  set {
-    name  = "argo-cd.configs.rbac.policy\\.csv"
-    value = "g, ${var.argocd_admin_email}, role:admin"
-  }
+  values = [yamlencode({
+    "argo-cd" = {
+      configs = {
+        cm = {
+          "oidc.config" = yamlencode({
+            name            = "Entra ID"
+            issuer          = "https://login.microsoftonline.com/${var.tenant_id}/v2.0"
+            clientID        = azuread_application.argocd.client_id
+            clientSecret    = "$oidc.entra.clientSecret"
+            requestedScopes = ["openid", "profile", "email"]
+          })
+        }
+        rbac = {
+          "policy.csv" = "g, ${var.argocd_admin_email}, role:admin"
+        }
+        secret = {
+          extra = {
+            "oidc.entra.clientSecret" = azuread_application_password.argocd.value
+          }
+        }
+      }
+    }
+  })]
 
   depends_on = [
     azurerm_kubernetes_cluster.this,
