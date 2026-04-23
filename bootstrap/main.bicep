@@ -160,6 +160,9 @@ module workspaceRoleAssignment 'br/public:avm/res/authorization/role-assignment/
     principalType: 'ServicePrincipal'
     enableTelemetry: false
   }
+  dependsOn: [
+    workspaceResourceGroup
+  ]
 }
 
 // Storage Blob Data Owner on the tfstate RG
@@ -172,6 +175,9 @@ module tfstateRoleAssignment 'br/public:avm/res/authorization/role-assignment/rg
     principalType: 'ServicePrincipal'
     enableTelemetry: false
   }
+  dependsOn: [
+    tfstateResourceGroup
+  ]
 }
 
 module tfstateUserRoleAssignment 'br/public:avm/res/authorization/role-assignment/rg-scope:0.1.1' = {
