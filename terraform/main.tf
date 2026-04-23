@@ -3,7 +3,7 @@ terraform {
     use_oidc         = true
     use_azuread_auth = true
   }
-  required_version = "~> 1.7"
+  required_version = "~> 1.9"
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
