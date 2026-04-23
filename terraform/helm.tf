@@ -20,6 +20,9 @@ resource "helm_release" "argocd" {
   wait    = true
 
   values = [yamlencode({
+    route = {
+      enabled = false  # HTTPRoute created by post-deploy after Gateway API CRDs exist
+    }
     "argo-cd" = {
       configs = {
         cm = {
@@ -121,10 +124,11 @@ resource "terraform_data" "post_deploy" {
       kubectl -n ${local.argocd_namespace} patch configmap argocd-cm \
         --type merge -p "{\"data\":{\"url\":\"$${ARGOCD_URL}\"}}"
 
-      # Update helm values for the HTTPRoute
+      # Update helm values — enable HTTPRoute now that Gateway API CRDs exist
       helm upgrade argocd ${path.module}/../helm/argocd \
         --namespace ${local.argocd_namespace} \
         --reuse-values \
+        --set "route.enabled=true" \
         --set "route.host=$${ARGOCD_HOST}" \
         --set "argo-cd.global.domain=$${ARGOCD_HOST}" \
         --wait --timeout 5m
