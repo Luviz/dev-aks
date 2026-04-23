@@ -13,9 +13,8 @@ resource "azuread_application" "argocd" {
   sign_in_audience = "AzureADMyOrg"
 
   web {
-    # Placeholder redirect — updated post-deploy once the LB IP is known
     redirect_uris = [
-      "https://argocd.localhost/auth/callback",
+      "https://${azurerm_cdn_frontdoor_endpoint.argocd.host_name}/auth/callback",
     ]
 
     implicit_grant {

@@ -126,31 +126,6 @@ jobs:
             echo "::warning::Could not get Envoy Gateway LB IP"
           fi
 
-      - name: Create self-signed TLS certificate
-        if: steps.lb_ip.outputs.ip != ''
-        run: |
-          LB_IP="${{ steps.lb_ip.outputs.ip }}"
-          DASHED=$(echo "$LB_IP" | tr '.' '-')
-          ARGOCD_HOST="argocd-${DASHED}.nip.io"
-
-          # Create self-signed cert for *.nip.io (ephemeral dev cluster)
-          openssl req -x509 -nodes -days 365 \
-            -newkey rsa:2048 \
-            -keyout /tmp/tls.key \
-            -out /tmp/tls.crt \
-            -subj "/CN=*.nip.io" \
-            -addext "subjectAltName=DNS:*.nip.io,DNS:${ARGOCD_HOST}" 2>/dev/null
-
-          # Create or replace the TLS secret in the envoy-gateway namespace
-          kubectl create secret tls gateway-tls \
-            --cert=/tmp/tls.crt \
-            --key=/tmp/tls.key \
-            -n envoy-gateway \
-            --dry-run=client -o yaml | kubectl apply -f -
-
-          rm -f /tmp/tls.key /tmp/tls.crt
-          echo "==> TLS secret gateway-tls created in envoy-gateway namespace"
-
       - name: Re-authenticate Azure (token refresh)
         if: steps.lb_ip.outputs.ip != ''
         uses: azure/login@v2
@@ -159,37 +134,47 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Configure Argo CD with LB IP
+      - name: Update Front Door origin with LB IP
         if: steps.lb_ip.outputs.ip != ''
         run: |
           LB_IP="${{ steps.lb_ip.outputs.ip }}"
-          DASHED=$(echo "$LB_IP" | tr '.' '-')
-          ARGOCD_HOST="argocd-${DASHED}.nip.io"
-          ARGOCD_URL="https://${ARGOCD_HOST}"
+          AFD_PROFILE=$(terraform output -raw frontdoor_profile_name)
+          AFD_ORIGIN_GROUP=$(terraform output -raw frontdoor_origin_group_name)
+          AFD_ORIGIN=$(terraform output -raw frontdoor_origin_name)
+          RG=$(terraform output -raw aks_resource_group)
 
-          ENTRA_CLIENT_ID=$(terraform output -raw argocd_entra_client_id)
+          AFD_HOSTNAME=$(terraform output -raw frontdoor_endpoint_hostname)
 
-          # Update Entra redirect URI
-          echo "==> Updating Entra app redirect URI to ${ARGOCD_URL}/auth/callback"
-          az ad app update \
-            --id "$ENTRA_CLIENT_ID" \
-            --web-redirect-uris "${ARGOCD_URL}/auth/callback" \
+          echo "==> Updating Front Door origin to ${LB_IP}..."
+          az afd origin update \
+            --resource-group "$RG" \
+            --profile-name "$AFD_PROFILE" \
+            --origin-group-name "$AFD_ORIGIN_GROUP" \
+            --origin-name "$AFD_ORIGIN" \
+            --host-name "$LB_IP" \
+            --origin-host-header "$AFD_HOSTNAME" \
             --only-show-errors
 
-          # Patch Argo CD configmap
-          echo "==> Patching Argo CD configmap with URL..."
+      - name: Configure Argo CD with Front Door URL
+        if: steps.lb_ip.outputs.ip != ''
+        run: |
+          AFD_HOSTNAME=$(terraform output -raw frontdoor_endpoint_hostname)
+          ARGOCD_URL="https://${AFD_HOSTNAME}"
+
+          # Patch Argo CD configmap with Front Door URL
+          echo "==> Patching Argo CD configmap with URL: ${ARGOCD_URL}"
           kubectl -n argocd patch configmap argocd-cm \
             --type merge -p "{\"data\":{\"url\":\"${ARGOCD_URL}\"}}"
 
-          # Enable HTTPRoute and set host via helm upgrade
+          # Enable HTTPRoute with Front Door hostname
           echo "==> Enabling HTTPRoute for Argo CD..."
           helm dependency update ../helm/argocd
           helm upgrade argocd ../helm/argocd \
             --namespace argocd \
             --reuse-values \
             --set "route.enabled=true" \
-            --set "route.host=${ARGOCD_HOST}" \
-            --set "argo-cd.global.domain=${ARGOCD_HOST}" \
+            --set "route.host=${AFD_HOSTNAME}" \
+            --set "argo-cd.global.domain=${AFD_HOSTNAME}" \
             --wait --timeout 5m
 
           echo "==> Post-deploy complete: ${ARGOCD_URL}"
@@ -197,13 +182,14 @@ jobs:
       - name: Summary
         run: |
           LB_IP="${{ steps.lb_ip.outputs.ip }}"
-          DASHED=$(echo "$LB_IP" | tr '.' '-')
+          AFD_HOSTNAME=$(terraform output -raw frontdoor_endpoint_hostname)
 
           echo "## Deployment Complete 🚀" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| AKS Cluster | \`$(terraform output -raw aks_cluster_name)\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Argo CD | https://argocd-${DASHED}.nip.io |" >> $GITHUB_STEP_SUMMARY
+          echo "| Argo CD | https://${AFD_HOSTNAME} |" >> $GITHUB_STEP_SUMMARY
           echo "| ACR | \`$(terraform output -raw acr_login_server)\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| LB IP | \`${LB_IP}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Front Door | \`${AFD_HOSTNAME}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Origin LB IP | \`${LB_IP}\` |" >> $GITHUB_STEP_SUMMARY

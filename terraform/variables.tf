@@ -44,6 +44,20 @@ variable "argocd_admin_object_id" {
   default     = ""
 }
 
+// ── Front Door ──────────────────────────────────────────────
+
+variable "frontdoor_origin_host" {
+  description = "Placeholder origin hostname/IP for Front Door. Updated post-deploy with real Envoy Gateway LB IP."
+  type        = string
+  default     = "10.0.0.1"
+}
+
+variable "dns_zone_name" {
+  description = "Name of the Azure DNS Zone (for future custom domain)."
+  type        = string
+  default     = ""
+}
+
 // ── Argo CD ────────────────────────────────────────────────
 
 variable "argocd_github_app_id" {

@@ -62,6 +62,12 @@ jobs:
           argocd_admin_object_id = "${{ vars.ARGOCD_ADMIN_OBJECT_ID || '' }}"
           EOF
 
+      - name: Build Helm chart dependencies
+        run: |
+          helm dependency update ../helm/argocd
+          helm dependency update ../helm/envoy-gateway
+          helm dependency update ../helm/argocd-apps 2>/dev/null || true
+
       - name: Terraform Init
         run: terraform init -backend-config=backend/ci.tfvars -input=false
 
