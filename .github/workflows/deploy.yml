@@ -126,6 +126,31 @@ jobs:
             echo "::warning::Could not get Envoy Gateway LB IP"
           fi
 
+      - name: Create self-signed TLS certificate
+        if: steps.lb_ip.outputs.ip != ''
+        run: |
+          LB_IP="${{ steps.lb_ip.outputs.ip }}"
+          DASHED=$(echo "$LB_IP" | tr '.' '-')
+          ARGOCD_HOST="argocd-${DASHED}.nip.io"
+
+          # Create self-signed cert for *.nip.io (ephemeral dev cluster)
+          openssl req -x509 -nodes -days 365 \
+            -newkey rsa:2048 \
+            -keyout /tmp/tls.key \
+            -out /tmp/tls.crt \
+            -subj "/CN=*.nip.io" \
+            -addext "subjectAltName=DNS:*.nip.io,DNS:${ARGOCD_HOST}" 2>/dev/null
+
+          # Create or replace the TLS secret in the envoy-gateway namespace
+          kubectl create secret tls gateway-tls \
+            --cert=/tmp/tls.crt \
+            --key=/tmp/tls.key \
+            -n envoy-gateway \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+          rm -f /tmp/tls.key /tmp/tls.crt
+          echo "==> TLS secret gateway-tls created in envoy-gateway namespace"
+
       - name: Re-authenticate Azure (token refresh)
         if: steps.lb_ip.outputs.ip != ''
         uses: azure/login@v2
