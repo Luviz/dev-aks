@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: terraform-vars
+  namespace: gitops-system
+  labels:
+    app.kubernetes.io/name: terraform-runner
+    app.kubernetes.io/part-of: gitops
+data:
+  # TODO: Set your values
+  TF_VAR_location: "swedencentral"
+  TF_VAR_environment: "dev"
+  TF_VAR_project_name: "REPLACE_WITH_PROJECT_NAME"
+  ARM_SUBSCRIPTION_ID: "REPLACE_WITH_SUBSCRIPTION_ID"
+  ARM_TENANT_ID: "REPLACE_WITH_TENANT_ID"
+  ARM_USE_OIDC: "true"

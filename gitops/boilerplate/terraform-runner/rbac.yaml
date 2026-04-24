@@ -1,0 +1,36 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: terraform-runner
+  namespace: gitops-system
+  labels:
+    app.kubernetes.io/name: terraform-runner
+    app.kubernetes.io/part-of: gitops
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: terraform-runner
+  namespace: gitops-system
+  labels:
+    app.kubernetes.io/name: terraform-runner
+    app.kubernetes.io/part-of: gitops
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: terraform-runner
+subjects:
+  - kind: ServiceAccount
+    name: terraform-runner
+    namespace: gitops-system

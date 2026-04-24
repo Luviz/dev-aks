@@ -1,0 +1,52 @@
+name: Build GitOps Boilerplate
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "gitops/boilerplate/**"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package boilerplate
+        run: |
+          cd gitops/boilerplate
+          tar czf ../../gitops-boilerplate.tar.gz \
+            --transform='s,^,gitops-boilerplate/,' \
+            .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitops-boilerplate
+          path: gitops-boilerplate.tar.gz
+          retention-days: 90
+
+      - name: Summary
+        run: |
+          echo "## 📦 GitOps Boilerplate Archive" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the \`gitops-boilerplate\` artifact from this workflow run." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Setup" >> $GITHUB_STEP_SUMMARY
+          echo '```sh' >> $GITHUB_STEP_SUMMARY
+          echo "tar xzf gitops-boilerplate.tar.gz" >> $GITHUB_STEP_SUMMARY
+          echo "cd gitops-boilerplate" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Configuration checklist" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] \`terraform-runner/serviceaccount.yaml\` — set \`azure.workload.identity/client-id\`" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] \`terraform-runner/configmap-tfvars.yaml\` — set subscription, tenant, project name" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] \`terraform-runner/job.yaml\` — update git clone repo URL" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] \`applications/*.yaml\` — update \`repoURL\`" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] \`terraform/main.tf\` — add your Azure resources" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See [docs/gitops-guide.md](../docs/gitops-guide.md) for full instructions." >> $GITHUB_STEP_SUMMARY
