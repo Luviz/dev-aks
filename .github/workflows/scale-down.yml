@@ -3,8 +3,8 @@ name: Scale Down (Minimal Cost)
 on:
   workflow_dispatch:
   schedule:
-    # Every weekday at 20:00 UTC (22:00 CET) — stop the cluster overnight
-    - cron: "0 20 * * 1-5"
+    - cron: "0 18 * * 1-5"
+      timezone: Europe/Stockholm
 
 permissions:
   id-token: write
