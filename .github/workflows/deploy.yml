@@ -143,7 +143,7 @@ jobs:
           AFD_ORIGIN=$(terraform output -raw frontdoor_origin_name)
           RG=$(terraform output -raw aks_resource_group)
 
-          AFD_HOSTNAME=$(terraform output -raw frontdoor_endpoint_hostname)
+          ARGOCD_HOST=$(terraform output -raw argocd_custom_hostname)
 
           echo "==> Updating Front Door origin to ${LB_IP}..."
           az afd origin update \
@@ -152,7 +152,7 @@ jobs:
             --origin-group-name "$AFD_ORIGIN_GROUP" \
             --origin-name "$AFD_ORIGIN" \
             --host-name "$LB_IP" \
-            --origin-host-header "$AFD_HOSTNAME" \
+            --origin-host-header "$ARGOCD_HOST" \
             --only-show-errors
 
       - name: Configure Argo CD with Front Door URL

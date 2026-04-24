@@ -36,7 +36,7 @@ resource "azurerm_cdn_frontdoor_origin_group" "argocd" {
 }
 
 // Origin uses a placeholder IP — updated post-deploy with the real Envoy Gateway LB IP.
-// origin_host_header is set to the AFD endpoint hostname so the Host header matches the HTTPRoute.
+// origin_host_header must match the HTTPRoute hostname so Envoy Gateway routes correctly.
 resource "azurerm_cdn_frontdoor_origin" "envoy_gateway" {
   name                          = "envoy-gateway-lb"
   cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.argocd.id
@@ -45,7 +45,7 @@ resource "azurerm_cdn_frontdoor_origin" "envoy_gateway" {
   host_name                      = var.frontdoor_origin_host
   http_port                      = 80
   https_port                     = 443
-  origin_host_header             = azurerm_cdn_frontdoor_endpoint.argocd.host_name
+  origin_host_header             = var.argocd_hostname
   certificate_name_check_enabled = false
   priority                       = 1
   weight                         = 1000
