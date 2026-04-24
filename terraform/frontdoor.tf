@@ -57,10 +57,31 @@ resource "azurerm_cdn_frontdoor_route" "argocd" {
   cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.argocd.id
   cdn_frontdoor_origin_ids      = [azurerm_cdn_frontdoor_origin.envoy_gateway.id]
 
+  cdn_frontdoor_custom_domain_ids = [azurerm_cdn_frontdoor_custom_domain.argocd.id]
+
   supported_protocols    = ["Https", "Http"]
   patterns_to_match      = ["/*"]
   forwarding_protocol    = "HttpOnly"
   https_redirect_enabled = true
 
   link_to_default_domain = true
+}
+
+// ── Custom domain with managed TLS ──────────────────────────
+
+resource "azurerm_cdn_frontdoor_custom_domain" "argocd" {
+  name                     = "argocd-custom-domain"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.this.id
+  dns_zone_id              = azurerm_dns_zone.this.id
+  host_name                = var.argocd_hostname
+
+  tls {
+    certificate_type    = "ManagedCertificate"
+    minimum_tls_version = "TLS12"
+  }
+}
+
+resource "azurerm_cdn_frontdoor_custom_domain_association" "argocd" {
+  cdn_frontdoor_custom_domain_id = azurerm_cdn_frontdoor_custom_domain.argocd.id
+  cdn_frontdoor_route_ids        = [azurerm_cdn_frontdoor_route.argocd.id]
 }

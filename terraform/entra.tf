@@ -14,6 +14,7 @@ resource "azuread_application" "argocd" {
 
   web {
     redirect_uris = [
+      "https://${var.argocd_hostname}/auth/callback",
       "https://${azurerm_cdn_frontdoor_endpoint.argocd.host_name}/auth/callback",
     ]
 

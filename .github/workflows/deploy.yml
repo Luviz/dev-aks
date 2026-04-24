@@ -158,23 +158,23 @@ jobs:
       - name: Configure Argo CD with Front Door URL
         if: steps.lb_ip.outputs.ip != ''
         run: |
-          AFD_HOSTNAME=$(terraform output -raw frontdoor_endpoint_hostname)
-          ARGOCD_URL="https://${AFD_HOSTNAME}"
+          ARGOCD_HOSTNAME=$(terraform output -raw argocd_custom_hostname)
+          ARGOCD_URL="https://${ARGOCD_HOSTNAME}"
 
-          # Patch Argo CD configmap with Front Door URL
+          # Patch Argo CD configmap with custom domain URL
           echo "==> Patching Argo CD configmap with URL: ${ARGOCD_URL}"
           kubectl -n argocd patch configmap argocd-cm \
             --type merge -p "{\"data\":{\"url\":\"${ARGOCD_URL}\"}}"
 
-          # Enable HTTPRoute with Front Door hostname
+          # Enable HTTPRoute with custom hostname
           echo "==> Enabling HTTPRoute for Argo CD..."
           helm dependency update ../helm/argocd
           helm upgrade argocd ../helm/argocd \
             --namespace argocd \
             --reuse-values \
             --set "route.enabled=true" \
-            --set "route.host=${AFD_HOSTNAME}" \
-            --set "argo-cd.global.domain=${AFD_HOSTNAME}" \
+            --set "route.host=${ARGOCD_HOSTNAME}" \
+            --set "argo-cd.global.domain=${ARGOCD_HOSTNAME}" \
             --wait --timeout 5m
 
           echo "==> Post-deploy complete: ${ARGOCD_URL}"
@@ -182,6 +182,7 @@ jobs:
       - name: Summary
         run: |
           LB_IP="${{ steps.lb_ip.outputs.ip }}"
+          ARGOCD_HOSTNAME=$(terraform output -raw argocd_custom_hostname)
           AFD_HOSTNAME=$(terraform output -raw frontdoor_endpoint_hostname)
 
           echo "## Deployment Complete 🚀" >> $GITHUB_STEP_SUMMARY
@@ -189,7 +190,13 @@ jobs:
           echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| AKS Cluster | \`$(terraform output -raw aks_cluster_name)\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Argo CD | https://${AFD_HOSTNAME} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Argo CD | https://${ARGOCD_HOSTNAME} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Front Door (default) | https://${AFD_HOSTNAME} |" >> $GITHUB_STEP_SUMMARY
           echo "| ACR | \`$(terraform output -raw acr_login_server)\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Front Door | \`${AFD_HOSTNAME}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Origin LB IP | \`${LB_IP}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### DNS Delegation (Cloudflare)" >> $GITHUB_STEP_SUMMARY
+          echo "Add these NS records for \`$(terraform output -raw dns_zone_nameservers | head -1 | xargs echo)\`:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          terraform output -json dns_zone_nameservers | jq -r '.[]' >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

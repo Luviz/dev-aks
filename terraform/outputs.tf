@@ -80,6 +80,11 @@ output "frontdoor_origin_name" {
 // ── DNS Zone ────────────────────────────────────────────────
 
 output "dns_zone_nameservers" {
-  description = "Nameservers for the Azure DNS Zone (delegate your domain here)."
-  value       = var.dns_zone_name != "" ? azurerm_dns_zone.this[0].name_servers : []
+  description = "Nameservers for the Azure DNS Zone — add these as NS records in Cloudflare."
+  value       = azurerm_dns_zone.this.name_servers
+}
+
+output "argocd_custom_hostname" {
+  description = "Custom hostname for Argo CD."
+  value       = var.argocd_hostname
 }

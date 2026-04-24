@@ -53,9 +53,15 @@ variable "frontdoor_origin_host" {
 }
 
 variable "dns_zone_name" {
-  description = "Name of the Azure DNS Zone (for future custom domain)."
+  description = "DNS zone name for subdomain delegation (e.g. aks.luvizdev.com)."
   type        = string
-  default     = ""
+  default     = "aks.luvizdev.com"
+}
+
+variable "argocd_hostname" {
+  description = "Custom hostname for Argo CD (e.g. argocd.aks.luvizdev.com)."
+  type        = string
+  default     = "argocd.aks.luvizdev.com"
 }
 
 // ── Argo CD ────────────────────────────────────────────────

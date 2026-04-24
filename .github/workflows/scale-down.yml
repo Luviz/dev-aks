@@ -3,8 +3,9 @@ name: Scale Down (Minimal Cost)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 18 * * 1-5"
-      timezone: Europe/Stockholm
+    # 22:00 CET/CEST — two crons to handle DST
+    - cron: "0 20 * * 1-5" # CEST (summer): 22:00 CEST = 20:00 UTC
+    - cron: "0 21 * * 1-5" # CET  (winter): 22:00 CET  = 21:00 UTC
 
 permissions:
   id-token: write
@@ -15,6 +16,19 @@ jobs:
     runs-on: ubuntu-latest
     environment: luviz-dev-MPN
     steps:
+      - name: Check CET/CEST timezone
+        if: github.event_name == 'schedule'
+        run: |
+          OFFSET=$(TZ=Europe/Stockholm date +%z)
+          HOUR_UTC=$(date -u +%H)
+          if [[ "$OFFSET" == "+0200" && "$HOUR_UTC" != "20" ]]; then
+            echo "Not CEST trigger hour — skipping"; exit 1
+          fi
+          if [[ "$OFFSET" == "+0100" && "$HOUR_UTC" != "21" ]]; then
+            echo "Not CET trigger hour — skipping"; exit 1
+          fi
+          echo "Timezone offset=$OFFSET, UTC hour=$HOUR_UTC — proceeding"
+
       - name: Checkout
         uses: actions/checkout@v5
 
