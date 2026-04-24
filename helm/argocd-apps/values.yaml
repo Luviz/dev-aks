@@ -7,3 +7,9 @@ envoyGateway:
   enabled: true
   namespace: envoy-gateway
   path: helm/envoy-gateway
+
+# GitOps applications (infra-terraform + workloads)
+gitopsApps:
+  enabled: true
+  namespace: argocd
+  path: gitops/applications

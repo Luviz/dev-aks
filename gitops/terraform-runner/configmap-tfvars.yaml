@@ -1,0 +1,18 @@
+# Terraform variable values — customize per environment
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: terraform-vars
+  namespace: gitops-system
+  labels:
+    app.kubernetes.io/name: terraform-runner
+    app.kubernetes.io/part-of: gitops
+data:
+  # Override terraform variables via TF_VAR_* environment variables
+  TF_VAR_location: "swedencentral"
+  TF_VAR_environment: "dev"
+  TF_VAR_project_name: "gitops-demo"
+  # Azure subscription for the Terraform provider
+  ARM_SUBSCRIPTION_ID: "37c9effe-ba3f-4b42-aaa7-afdcfeafa9b2"
+  ARM_TENANT_ID: "8a704dd9-896d-4f97-bca1-1b8720c76951"
+  ARM_USE_OIDC: "true"
