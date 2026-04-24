@@ -67,16 +67,13 @@ gitops/
 │   ├── providers.tf              # azurerm with Workload Identity (OIDC)
 │   ├── main.tf                   # Your Azure resources go here
 │   ├── variables.tf              # Input variables
-│   ├── outputs.tf                # Outputs synced to K8s ConfigMap
-│   └── _outputs-sync.sh          # Script: TF outputs → ConfigMap
+│   ├── outputs.tf                # Outputs available via Terraform CR status
 │
-├── terraform-runner/             # K8s manifests for in-cluster TF execution
+├── terraform-runner/             # K8s manifests for terraform-operator
 │   ├── kustomization.yaml
 │   ├── namespace.yaml            # gitops-system namespace
 │   ├── serviceaccount.yaml       # Workload Identity SA
-│   ├── rbac.yaml                 # Secrets + ConfigMaps + Leases access
-│   ├── configmap-tfvars.yaml     # TF variables as env vars (TF_VAR_*)
-│   └── job.yaml                  # Argo Sync hook: init → apply → sync
+│   └── terraform-cr.yaml         # Terraform CR (operator reconciles this)
 │
 ├── workloads/                    # K8s workloads consuming TF outputs
 │   ├── kustomization.yaml
@@ -369,60 +366,37 @@ annotations:
 
 ## Consuming Terraform Outputs
 
-After the TF runner Job completes, outputs are synced to a ConfigMap:
+After the terraform-operator applies the Terraform CR, outputs are available
+in the CR's status. You can read them with:
 
 ```sh
-kubectl get configmap gitops-tf-outputs -n gitops-system -o yaml
+# View Terraform CR status and outputs
+kubectl get terraform gitops-infra -n gitops-system -o jsonpath='{.status}' | jq .
+
+# View specific output
+kubectl get terraform gitops-infra -n gitops-system -o jsonpath='{.status.outputs.resource_group_name}'
 ```
 
-### In deployments (env vars)
-
-```yaml
-env:
-  - name: STORAGE_ACCOUNT
-    valueFrom:
-      configMapKeyRef:
-        name: gitops-tf-outputs
-        key: storage_account_name
-```
-
-### In deployments (volume mount)
-
-```yaml
-volumes:
-  - name: tf-outputs
-    configMap:
-      name: gitops-tf-outputs
-containers:
-  - volumeMounts:
-      - name: tf-outputs
-        mountPath: /etc/tf-outputs
-        readOnly: true
-```
-
-### Cross-namespace access
-
-The ConfigMap lives in `gitops-system`. To access it from other namespaces,
-either:
-- Copy it with a CronJob / controller
-- Use the Kubernetes Replicator operator
-- Reference it directly if your RBAC allows cross-namespace ConfigMap reads
+To make outputs available as a ConfigMap for workloads, create an ExternalSecret
+or a simple CronJob that reads the CR status and writes to a ConfigMap.
 
 ---
 
 ## Troubleshooting
 
-### TF runner Job fails
+### Terraform CR not reconciling
 
 ```sh
-# Check Job status
-kubectl get jobs -n gitops-system
+# Check Terraform CR status
+kubectl get terraform -n gitops-system
+kubectl describe terraform gitops-infra -n gitops-system
 
-# View logs
-kubectl logs -n gitops-system -l app.kubernetes.io/name=terraform-runner --tail=100
+# View runner pod logs
+kubectl get pods -n gitops-system -l app.kubernetes.io/created-by=terraform-operator
+kubectl logs -n gitops-system -l app.kubernetes.io/created-by=terraform-operator --tail=100
 
-# Check Workload Identity token
-kubectl exec -it <pod> -n gitops-system -- cat /var/run/secrets/azure/tokens/azure-identity-token
+# Check operator logs
+kubectl logs -n tf-system -l app.kubernetes.io/name=terraform-operator --tail=50
 ```
 
 ### State locked
@@ -437,9 +411,8 @@ kubectl delete lease tflock-default -n gitops-system
 
 ### ConfigMap not created
 
-The `_outputs-sync.sh` script needs `kubectl` and `jq` available in the container.
-The `hashicorp/terraform` image includes these. If using a custom image, ensure
-both are installed.
+If you need TF outputs in a ConfigMap, create a CronJob or use the Kubernetes
+Replicator operator to sync from the Terraform CR status.
 
 ### Argo CD not syncing
 

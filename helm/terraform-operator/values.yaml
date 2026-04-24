@@ -1,0 +1,18 @@
+terraform-operator:
+  controller:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: ghcr.io/galleybytes/terraform-operator
+      tag: v0.17.1
+      pullPolicy: IfNotPresent
+    args:
+      - --zap-log-level=info
+      - --zap-encoder=console
+    resources:
+      limits:
+        cpu: 50m
+        memory: 128M
+      requests:
+        cpu: 25m
+        memory: 64M

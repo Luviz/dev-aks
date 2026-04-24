@@ -6,6 +6,4 @@ namespace: gitops-system
 resources:
   - namespace.yaml
   - serviceaccount.yaml
-  - rbac.yaml
-  - configmap-tfvars.yaml
-  - job.yaml
+  - terraform-cr.yaml

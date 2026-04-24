@@ -1,0 +1,57 @@
+# Terraform CR — the terraform-operator watches this and runs plan/apply
+apiVersion: tf.galleybytes.com/v1beta1
+kind: Terraform
+metadata:
+  name: gitops-infra
+  namespace: gitops-system
+  labels:
+    app.kubernetes.io/name: gitops-infra
+    app.kubernetes.io/part-of: gitops
+spec:
+  terraformVersion: "1.9.0"
+
+  # Git module source
+  terraformModule:
+    source: https://github.com/Luviz/dev-aks.git//gitops/terraform?ref=main
+
+  # Kubernetes backend — state stored as K8s secret in this namespace
+  backend: |-
+    terraform {
+      backend "kubernetes" {
+        secret_suffix     = "gitops-infra"
+        in_cluster_config = true
+        namespace         = "gitops-system"
+      }
+    }
+
+  # Write TF outputs to a ConfigMap for workloads to consume
+  outputsToOmit: []
+
+  # Env vars for the Terraform runner pods
+  taskOptions:
+    - for:
+        - "*"
+      env:
+        - name: TF_VAR_location
+          value: "swedencentral"
+        - name: TF_VAR_environment
+          value: "dev"
+        - name: TF_VAR_project_name
+          value: "gitops-demo"
+        - name: ARM_SUBSCRIPTION_ID
+          value: "37c9effe-ba3f-4b42-aaa7-afdcfeafa9b2"
+        - name: ARM_TENANT_ID
+          value: "8a704dd9-896d-4f97-bca1-1b8720c76951"
+        - name: ARM_USE_OIDC
+          value: "true"
+      serviceAccount: terraform-runner
+      annotations:
+        azure.workload.identity/inject-proxy-sidecar: "false"
+      labels:
+        azure.workload.identity/use: "true"
+
+  # Don't delete cloud resources when CR is deleted
+  ignoreDelete: true
+
+  # No SCM auth needed for public repo
+  scmAuthMethods: []

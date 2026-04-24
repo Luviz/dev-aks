@@ -1,0 +1,11 @@
+apiVersion: v2
+name: terraform-operator
+description: Terraform Operator for Kubernetes — manages Azure resources via CRDs
+type: application
+version: 0.1.0
+appVersion: "0.17.1"
+
+dependencies:
+  - name: terraform-operator
+    version: "0.7.3"
+    repository: "https://galleybytes.github.io/helm-charts"

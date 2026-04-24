@@ -13,3 +13,9 @@ gitopsApps:
   enabled: true
   namespace: argocd
   path: gitops/applications
+
+# Terraform Operator (CRD-based TF management)
+terraformOperator:
+  enabled: true
+  namespace: tf-system
+  path: helm/terraform-operator

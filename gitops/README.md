@@ -6,28 +6,32 @@ orchestrated by Argo CD.
 ## How It Works
 
 ```
-┌─────────────┐     syncs      ┌───────────────────┐    runs     ┌──────────────┐
-│  Argo CD    │ ──────────────▶│ terraform-runner/  │ ──────────▶│  Terraform   │
-│  (in-cluster)│               │ (K8s Job)          │            │  (Azure)     │
-└─────────────┘                └───────────────────┘            └──────┬───────┘
-       │                                                                │
-       │ syncs                                              outputs → ConfigMap
-       ▼                                                                │
-┌─────────────┐                ┌───────────────────┐                   │
-│  workloads/ │ ◀──────────────│ gitops-tf-outputs  │ ◀────────────────┘
-│  (apps)     │   env from CM  │ (ConfigMap)        │
+┌─────────────┐     syncs      ┌───────────────────┐
+│  Argo CD    │ ──────────────▶│ terraform-runner/  │
+│  (in-cluster)│               │ (Terraform CR)     │
+└─────────────┘                └────────┬──────────┘
+       │                                │ reconciles
+       │ syncs                          ▼
+       │                       ┌───────────────────┐    provisions   ┌──────────────┐
+       │                       │ terraform-operator │ ──────────────▶│  Azure       │
+       │                       │ (CRD controller)   │                │  resources   │
+       │                       └───────────────────┘                └──────────────┘
+       ▼
+┌─────────────┐                ┌───────────────────┐
+│  workloads/ │ ◀──────────────│ TF outputs (status)│
+│  (apps)     │                │                    │
 └─────────────┘                └───────────────────┘
 ```
 
-1. **Argo CD** watches `gitops/applications/` and syncs two apps:
-   - `infra-terraform` — manages the TF runner Job
+1. **Argo CD** watches `gitops/applications/` and syncs apps:
+   - `infra-terraform` — manages the Terraform CR
    - `workloads` — deploys application manifests
-2. **terraform-runner/** contains K8s manifests (Job, SA, RBAC) that execute
-   Terraform inside the cluster using Azure Workload Identity.
-3. **terraform/** holds the actual TF code. State is stored as K8s secrets
+2. **terraform-operator** (GalleyBytes) watches `Terraform` CRs and runs
+   plan/apply in runner pods with Workload Identity.
+3. **terraform/** holds the TF code. State is stored as K8s secrets
    (Kubernetes backend) — no external storage needed.
-4. **TF outputs** are exported to a ConfigMap (`gitops-tf-outputs`) that
-   workloads can consume as environment variables or volume mounts.
+4. **TF outputs** are available via the Terraform CR status and can be
+   consumed by workloads.
 
 ## Folder Structure
 
@@ -35,7 +39,7 @@ orchestrated by Argo CD.
 | ------------------- | ------------------------------------------------ |
 | `applications/`     | Argo CD Application manifests                    |
 | `terraform/`        | Terraform code for Azure resources               |
-| `terraform-runner/` | K8s manifests: Job, ServiceAccount, RBAC         |
+| `terraform-runner/` | K8s manifests: Terraform CR, ServiceAccount       |
 | `workloads/`        | Application deployments consuming TF outputs     |
 
 ## Quick Start

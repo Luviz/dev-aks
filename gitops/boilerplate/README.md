@@ -11,9 +11,10 @@ A ready-to-use template for managing Azure resources from AKS via Argo CD + Terr
 ## Configuration Checklist
 
 - [ ] `terraform-runner/serviceaccount.yaml` — set `azure.workload.identity/client-id`
-- [ ] `terraform-runner/configmap-tfvars.yaml` — set subscription, tenant, project name
+- [ ] `terraform-runner/terraform-cr.yaml` — update `terraformModule.source` repo URL
+- [ ] `terraform-runner/terraform-cr.yaml` — set subscription, tenant, project name in `taskOptions`
 - [ ] `terraform/main.tf` — add your Azure resources
-- [ ] `terraform/outputs.tf` — add outputs to expose via ConfigMap
+- [ ] `terraform/outputs.tf` — add outputs (operator writes them to a status)
 - [ ] `workloads/` — replace example-app with your workloads
 - [ ] `applications/*.yaml` — update `repoURL` to your Git repo
 
